@@ -1,24 +1,28 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
+
 const Medicine = require('../models/Medicine');
 const Bill = require('../models/Bill');
 const auth = require('../middleware/auth');
 
-// Get all medicines for bill form
+// Get all medicines
 router.get('/medicines-list', auth, async (req, res) => {
   try {
     const meds = await Medicine.find({}, 'name strips tabletsPerStrip price medId');
     res.json(meds);
   } catch (err) {
+    console.error('Medicine list error:', err);
     res.status(500).json({ error: 'Failed to load medicines.' });
   }
 });
 
-// Generate bill + update stock (TABLET based)
+// Generate bill
 router.post('/generate', auth, async (req, res) => {
   try {
     const { patientName, patientAge, patientPhone, patientGender, items } = req.body;
 
+    // ✅ Validation
     if (!patientName || !patientAge || !items || items.length === 0) {
       return res.status(400).json({ error: 'Missing required fields.' });
     }
@@ -29,26 +33,33 @@ router.post('/generate', auth, async (req, res) => {
     for (const item of items) {
       const tablets = Number(item.tablets);
 
+      // ✅ Validate ObjectId
+      if (!mongoose.Types.ObjectId.isValid(item.medicineId)) {
+        return res.status(400).json({ error: 'Invalid medicine ID' });
+      }
+
       if (!item.medicineId || !tablets || tablets < 1) continue;
 
       const med = await Medicine.findById(item.medicineId);
+
       if (!med) {
-        return res.status(404).json({ error: 'Medicine not found. Please refresh and try again.' });
+        return res.status(404).json({ error: 'Medicine not found. Refresh page.' });
       }
 
-      const totalAvailableTablets = med.strips * med.tabletsPerStrip;
+      const totalAvailable = med.strips * med.tabletsPerStrip;
 
-      if (tablets > totalAvailableTablets) {
+      if (tablets > totalAvailable) {
         return res.status(400).json({
-          error: `Not enough tablets for "${med.name}". Requested: ${tablets}, Available: ${totalAvailableTablets}`
+          error: `Not enough tablets for "${med.name}". Requested: ${tablets}, Available: ${totalAvailable}`
         });
       }
 
       const pricePerTablet = med.price / med.tabletsPerStrip;
       const total = parseFloat((tablets * pricePerTablet).toFixed(2));
+
       grandTotal += total;
 
-      // Deduct: how many full strips used (ceiling)
+      // Deduct stock
       const stripsToDeduct = Math.ceil(tablets / med.tabletsPerStrip);
       med.strips = Math.max(0, med.strips - stripsToDeduct);
       await med.save();
@@ -56,7 +67,7 @@ router.post('/generate', auth, async (req, res) => {
       billItems.push({
         medicineId: med._id,
         name: med.name,
-        tablets: tablets,
+        tablets,
         tabletsPerStrip: med.tabletsPerStrip,
         pricePerTablet: parseFloat(pricePerTablet.toFixed(2)),
         total
@@ -64,47 +75,72 @@ router.post('/generate', auth, async (req, res) => {
     }
 
     if (billItems.length === 0) {
-      return res.status(400).json({ error: 'No valid medicines added to bill.' });
+      return res.status(400).json({ error: 'No valid medicines added.' });
     }
 
-    // Fix: get generatedBy safely from session
-    const generatedBy = req.session.user.name || req.session.user.empId || 'Unknown';
+    // ✅ SAFE SESSION ACCESS
+    const generatedBy =
+      req.session?.user?.name ||
+      req.session?.user?.empId ||
+      'Unknown';
 
-    const bill = await Bill.create({
-      patientName,
-      patientAge: Number(patientAge),
-      patientPhone: patientPhone || '',
-      patientGender: patientGender || '',
-      items: billItems,
-      grandTotal: parseFloat(grandTotal.toFixed(2)),
-      generatedBy
+    // ✅ Handle duplicate billNo
+    let bill;
+    try {
+      bill = await Bill.create({
+        patientName,
+        patientAge: Number(patientAge),
+        patientPhone: patientPhone || '',
+        patientGender: patientGender || '',
+        items: billItems,
+        grandTotal: parseFloat(grandTotal.toFixed(2)),
+        generatedBy
+      });
+    } catch (err) {
+      if (err.code === 11000) {
+        return res.status(500).json({ error: 'Duplicate bill number. Try again.' });
+      }
+      throw err;
+    }
+
+    res.json({
+      success: true,
+      billNo: bill.billNo,
+      billId: bill._id
     });
 
-    res.json({ success: true, billNo: bill.billNo, billId: bill._id });
-
   } catch (err) {
-    console.error('Bill generation error:', err);
-    res.status(500).json({ error: 'Server error: ' + err.message });
+    console.error('🔥 Bill generation error:', err);
+    res.status(500).json({
+      error: 'Server error: ' + err.message
+    });
   }
 });
 
-// Delete bill (admin only)
+// Delete bill
 router.delete('/delete/:id', auth, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin only.' });
     }
+
     await Bill.findByIdAndDelete(req.params.id);
     res.json({ success: true });
+
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Failed to delete bill.' });
   }
 });
 
-// Get single bill for print
+// Get single bill
 router.get('/:id', auth, async (req, res) => {
-  const bill = await Bill.findById(req.params.id);
-  res.json(bill);
+  try {
+    const bill = await Bill.findById(req.params.id);
+    res.json(bill);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch bill.' });
+  }
 });
 
 module.exports = router;

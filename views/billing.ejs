@@ -202,75 +202,67 @@
     document.getElementById('grand-total').textContent = hasError ? '---' : grand.toFixed(2);
   }
 
-  async function generateBill() {
-    const patientName = document.getElementById('patientName').value.trim();
-    const patientAge = document.getElementById('patientAge').value.trim();
-    const patientPhone = document.getElementById('patientPhone').value.trim();
-    const patientGender = document.getElementById('patientGender').value;
+async function generateBill() {
+  const patientName = document.getElementById('patientName').value.trim();
+  const patientAge = document.getElementById('patientAge').value.trim();
+  const patientPhone = document.getElementById('patientPhone').value.trim();
+  const patientGender = document.getElementById('patientGender').value;
 
-    if (!patientName || !patientAge) {
-      showError('Please fill in patient name and age.');
-      return;
-    }
-
-    const rows = document.querySelectorAll('.medicine-row');
-    const items = [];
-
-    for (const row of rows) {
-      const select = row.querySelector('select');
-      const opt = select.selectedOptions[0];
-      const tabletsInput = row.querySelector('input[type="number"]');
-      const medId = select.value;
-      const tablets = Number(tabletsInput.value);
-      const totalAvailable = Number(opt?.dataset.total || 0);
-
-      if (!medId || !tablets) continue;
-
-      if (tablets > totalAvailable) {
-        showError(`Not enough tablets for "${opt.text.split('(')[0].trim()}". Available: ${totalAvailable}`);
-        return;
-      }
-
-      if (tablets <= 0) {
-        showError('Tablet quantity must be at least 1.');
-        return;
-      }
-
-      items.push({ medicineId: medId, tablets });
-    }
-
-    if (items.length === 0) {
-      showError('Please add at least one medicine.');
-      return;
-    }
-
-    const btn = document.getElementById('generate-btn');
-    btn.textContent = 'Generating...';
-    btn.disabled = true;
-
-    try {
-      const res = await fetch('/api/bill/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ patientName, patientAge, patientPhone, patientGender, items })
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        window.open('/print-bill/' + data.billId, '_blank');
-        setTimeout(() => location.reload(), 500);
-      } else {
-        showError(data.error || 'Something went wrong.');
-        btn.textContent = 'Generate & Print Bill';
-        btn.disabled = false;
-      }
-    } catch (err) {
-      showError('Network error. Please try again.');
-      btn.textContent = 'Generate & Print Bill';
-      btn.disabled = false;
-    }
+  if (!patientName || !patientAge) {
+    showError('Please fill in patient name and age.');
+    return;
   }
+
+  const rows = document.querySelectorAll('.medicine-row');
+  const items = [];
+
+  for (const row of rows) {
+    const select = row.querySelector('select');
+    const tabletsInput = row.querySelector('input[type="number"]');
+
+    const medId = select.value;
+    const tablets = Number(tabletsInput.value);
+
+    if (!medId || !tablets || tablets <= 0) continue;
+
+    items.push({ medicineId: medId, tablets });
+  }
+
+  if (items.length === 0) {
+    showError('Please add at least one medicine.');
+    return;
+  }
+
+  console.log("DEBUG DATA:", { patientName, patientAge, items });
+
+  const btn = document.getElementById('generate-btn');
+  btn.textContent = 'Generating...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/bill/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ patientName, patientAge, patientPhone, patientGender, items })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      window.open('/print-bill/' + data.billId, '_blank');
+      setTimeout(() => location.reload(), 500);
+    } else {
+      showError(data.error || 'Something went wrong.');
+    }
+
+  } catch (err) {
+    console.error(err);
+    showError('Network error.');
+  }
+
+  btn.textContent = 'Generate & Print Bill';
+  btn.disabled = false;
+}
 
   function showError(msg) {
     const el = document.getElementById('error-msg');

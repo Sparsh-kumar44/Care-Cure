@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Edit Medicine | Care & Cure</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="container">
+
+  <div class="sidebar">
+    <h2>Care &amp; Cure</h2>
+    <a href="/dashboard">Dashboard</a>
+    <a href="/medicines">Medicines</a>
+    <a href="/employees">Employees</a>
+        <a href="/billing">Billing</a>
+<a href="/bills">Bill History</a>
+    <a href="/logout">Logout</a>
+  </div>
+
+  <div class="main">
+
+    <h1 class="page-title">Edit Medicine</h1>
+
+    <div class="form-box">
+      <h2>Update Details</h2>
+      <form method="POST" action="/edit-med/<%= med._id %>">
+        <input name="name" placeholder="Medicine Name" value="<%= med.name %>" required>
+        <div style="display:flex; gap:12px;">
+          <input name="strips" type="number" placeholder="Number of Strips" value="<%= med.strips %>" min="1" required style="flex:1;">
+          <input name="tabletsPerStrip" type="number" placeholder="Tablets per Strip" value="<%= med.tabletsPerStrip %>" min="1" required style="flex:1;">
+        </div>
+        <input name="expiry" type="date" value="<%= med.expiry ? med.expiry.toISOString().split('T')[0] : '' %>" required>
+        <input name="price" type="number" placeholder="Price per Strip (₹)" value="<%= med.price %>" required>
+        <div class="btn-group">
+          <button type="submit">Update Medicine</button>
+          <a href="/medicines"><button type="button" style="background:#888;">Cancel</button></a>
+        </div>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

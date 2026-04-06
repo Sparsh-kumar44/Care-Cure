@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dashboard | Care & Cure</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <h2>Care &amp; Cure</h2>
+    <a href="/dashboard">Dashboard</a>
+    <a href="/medicines">Medicines</a>
+    <a href="/employees">Employees</a>
+    <a href="/logout">Logout</a>
+    <a href="/billing">Billing</a>
+<a href="/bills">Bill History</a>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main">
+
+    <h2 class="page-title">Welcome <%= user ? user.name + ' !' : '' %></h2>
+
+    <!-- Stats Cards -->
+    <div class="cards">
+      <div class="card">
+        <h3>Total Medicines</h3>
+        <p><%= totalMeds %></p>
+      </div>
+      <div class="card">
+        <h3>Expired Medicines</h3>
+        <p><%= expiredMeds %></p>
+      </div>
+      <div class="card">
+        <h3>Total Employees</h3>
+        <p><%= totalEmployees %></p>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="form-box">
+      <h2>Quick Actions</h2>
+      <div class="btn-group">
+        <a href="/medicines"><button>Add / Manage Medicines</button></a>
+        <a href="/employees"><button>Manage Employees</button></a>
+      </div>
+    </div>
+
+    <!-- Recent Medicines -->
+    <div class="form-box">
+      <h2>Recent Medicines</h2>
+      <table>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Qty</th>
+          <th>Expiry</th>
+        </tr>
+        <% if (medicines && medicines.length > 0) { %>
+          <% medicines.forEach(m => { %>
+            <tr>
+              <td><%= m.medId %></td>
+              <td><%= m.name %></td>
+              <td><%= m.quantity %></td>
+              <td><%= new Date(m.expiry).toDateString() %></td>
+            </tr>
+          <% }) %>
+        <% } else { %>
+          <tr>
+            <td colspan="4">No medicines found</td>
+          </tr>
+        <% } %>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

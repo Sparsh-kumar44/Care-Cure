@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Billing | Care & Cure</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .patient-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .patient-grid select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; outline: none; }
+    .medicine-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 10px; align-items: center; margin-bottom: 10px; }
+    .medicine-row select { padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; width: 100%; }
+    .medicine-row input { text-align: center; }
+    .medicine-row .info-cell { background: #f0f4f8; border-radius: 8px; padding: 10px; font-size: 13px; color: #555; text-align: center; border: 1px solid #ddd; }
+    .medicine-row .remove-btn { background: #e74c3c; color: white; border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-size: 16px; }
+    .medicine-row .remove-btn:hover { background: #c0392b; }
+    .col-headers { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 10px; margin-bottom: 6px; font-size: 12px; color: #888; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px; padding: 0 2px; }
+    #add-row-btn { background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; margin-bottom: 16px; }
+    #add-row-btn:hover { background: #219150; }
+    .summary-box { background: #f8f9fa; border-radius: 10px; padding: 16px 20px; margin-top: 16px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e8edf2; }
+    .summary-box .label { font-size: 16px; color: #555; }
+    .summary-box .amount { font-size: 24px; font-weight: 700; color: #1a1a1a; }
+    #generate-btn { padding: 13px 36px; font-size: 16px; background: #4facfe; color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 16px; transition: 0.3s; }
+    #generate-btn:hover { background: #2f80ed; }
+    #generate-btn:disabled { background: #aaa; cursor: not-allowed; }
+    #error-msg { background: #ff4d4d; color: white; padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; display: none; font-size: 14px; }
+    #success-msg { background: #27ae60; color: white; padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; display: none; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="sidebar">
+    <h2>Care &amp; Cure</h2>
+    <a href="/dashboard">Dashboard</a>
+    <a href="/medicines">Medicines</a>
+    <a href="/employees">Employees</a>
+    <a href="/billing">Billing</a>
+    <a href="/bills">Bill History</a>
+    <a href="/logout">Logout</a>
+  </div>
+
+  <div class="main">
+    <h1 class="page-title">Bill Generator</h1>
+
+    <div id="error-msg"></div>
+    <div id="success-msg"></div>
+
+    <!-- Patient Details -->
+    <div class="form-box">
+      <h2>Patient Details</h2>
+      <div class="patient-grid">
+        <input id="patientName" placeholder="Patient Name" required>
+        <input id="patientAge" type="number" placeholder="Age" min="1" max="120" required>
+        <input id="patientPhone" placeholder="Phone Number (optional)">
+        <select id="patientGender">
+          <option value="">Gender (optional)</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Medicine Rows -->
+    <div class="form-box">
+      <h2>Add Medicines</h2>
+
+      <div class="col-headers">
+        <span>Medicine</span>
+        <span style="text-align:center">Tablets</span>
+        <span style="text-align:center">Available</span>
+        <span style="text-align:center">Amount (₹)</span>
+        <span></span>
+      </div>
+
+      <div id="medicine-rows"></div>
+
+      <button id="add-row-btn" onclick="addRow()">+ Add Medicine</button>
+
+      <div class="summary-box">
+        <span class="label">Grand Total</span>
+        <span class="amount">₹<span id="grand-total">0.00</span></span>
+      </div>
+
+      <button id="generate-btn" onclick="generateBill()">Generate &amp; Print Bill</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let medicines = [];
+
+  fetch('/api/bill/medicines-list')
+    .then(r => r.json())
+    .then(data => {
+      medicines = data;
+      addRow();
+    })
+    .catch(() => showError('Failed to load medicines. Please refresh.'));
+
+  function addRow() {
+    const container = document.getElementById('medicine-rows');
+    const idx = Date.now();
+
+    const row = document.createElement('div');
+    row.className = 'medicine-row';
+    row.id = 'row-' + idx;
+
+    // Medicine select
+    const select = document.createElement('select');
+    select.innerHTML = '<option value="">-- Select Medicine --</option>' +
+      medicines.map(m => {
+        const totalTablets = m.strips * m.tabletsPerStrip;
+        return `<option value="${m._id}"
+          data-price="${m.price}"
+          data-strips="${m.strips}"
+          data-tps="${m.tabletsPerStrip}"
+          data-total="${totalTablets}"
+          data-ppt="${(m.price / m.tabletsPerStrip).toFixed(2)}">
+          ${m.name} (${totalTablets} tablets available)
+        </option>`;
+      }).join('');
+    select.onchange = () => calcRow(idx);
+
+    // Tablets input
+    const tabletsInput = document.createElement('input');
+    tabletsInput.type = 'number';
+    tabletsInput.placeholder = 'Qty';
+    tabletsInput.min = 1;
+    tabletsInput.id = 'tablets-' + idx;
+    tabletsInput.oninput = () => calcRow(idx);
+
+    // Available display
+    const availableCell = document.createElement('div');
+    availableCell.className = 'info-cell';
+    availableCell.id = 'avail-' + idx;
+    availableCell.textContent = '-';
+
+    // Total display
+    const totalCell = document.createElement('div');
+    totalCell.className = 'info-cell';
+    totalCell.id = 'rowtotal-' + idx;
+    totalCell.textContent = '-';
+
+    // Remove button
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'remove-btn';
+    removeBtn.textContent = '✕';
+    removeBtn.onclick = () => { row.remove(); calcGrand(); };
+
+    row.appendChild(select);
+    row.appendChild(tabletsInput);
+    row.appendChild(availableCell);
+    row.appendChild(totalCell);
+    row.appendChild(removeBtn);
+    container.appendChild(row);
+  }
+
+  function calcRow(idx) {
+    const row = document.getElementById('row-' + idx);
+    const select = row.querySelector('select');
+    const opt = select.selectedOptions[0];
+    const tablets = Number(document.getElementById('tablets-' + idx).value);
+    const totalAvailable = Number(opt?.dataset.total || 0);
+    const pricePerTablet = Number(opt?.dataset.ppt || 0);
+
+    const availCell = document.getElementById('avail-' + idx);
+    const totalCell = document.getElementById('rowtotal-' + idx);
+
+    if (!opt?.value) {
+      availCell.textContent = '-';
+      totalCell.textContent = '-';
+      calcGrand();
+      return;
+    }
+
+    availCell.textContent = totalAvailable + ' tabs';
+
+    if (tablets > totalAvailable) {
+      availCell.style.color = '#e74c3c';
+      availCell.style.fontWeight = '700';
+      totalCell.textContent = '⚠ Insufficient';
+      totalCell.style.color = '#e74c3c';
+    } else {
+      availCell.style.color = '#27ae60';
+      availCell.style.fontWeight = '600';
+      const amount = (tablets * pricePerTablet).toFixed(2);
+      totalCell.textContent = '₹' + amount;
+      totalCell.style.color = '#1a1a1a';
+    }
+
+    calcGrand();
+  }
+
+  function calcGrand() {
+    let grand = 0;
+    let hasError = false;
+    document.querySelectorAll('[id^="rowtotal-"]').forEach(el => {
+      if (el.textContent.includes('⚠')) { hasError = true; return; }
+      const val = parseFloat(el.textContent.replace('₹', '')) || 0;
+      grand += val;
+    });
+    document.getElementById('grand-total').textContent = hasError ? '---' : grand.toFixed(2);
+  }
+
+  async function generateBill() {
+    const patientName = document.getElementById('patientName').value.trim();
+    const patientAge = document.getElementById('patientAge').value.trim();
+    const patientPhone = document.getElementById('patientPhone').value.trim();
+    const patientGender = document.getElementById('patientGender').value;
+
+    if (!patientName || !patientAge) {
+      showError('Please fill in patient name and age.');
+      return;
+    }
+
+    const rows = document.querySelectorAll('.medicine-row');
+    const items = [];
+
+    for (const row of rows) {
+      const select = row.querySelector('select');
+      const opt = select.selectedOptions[0];
+      const tabletsInput = row.querySelector('input[type="number"]');
+      const medId = select.value;
+      const tablets = Number(tabletsInput.value);
+      const totalAvailable = Number(opt?.dataset.total || 0);
+
+      if (!medId || !tablets) continue;
+
+      if (tablets > totalAvailable) {
+        showError(`Not enough tablets for "${opt.text.split('(')[0].trim()}". Available: ${totalAvailable}`);
+        return;
+      }
+
+      if (tablets <= 0) {
+        showError('Tablet quantity must be at least 1.');
+        return;
+      }
+
+      items.push({ medicineId: medId, tablets });
+    }
+
+    if (items.length === 0) {
+      showError('Please add at least one medicine.');
+      return;
+    }
+
+    const btn = document.getElementById('generate-btn');
+    btn.textContent = 'Generating...';
+    btn.disabled = true;
+
+    try {
+      const res = await fetch('/api/bill/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patientName, patientAge, patientPhone, patientGender, items })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        window.open('/print-bill/' + data.billId, '_blank');
+        setTimeout(() => location.reload(), 500);
+      } else {
+        showError(data.error || 'Something went wrong.');
+        btn.textContent = 'Generate & Print Bill';
+        btn.disabled = false;
+      }
+    } catch (err) {
+      showError('Network error. Please try again.');
+      btn.textContent = 'Generate & Print Bill';
+      btn.disabled = false;
+    }
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-msg');
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 5000);
+  }
+</script>
+
+</body>
+</html>

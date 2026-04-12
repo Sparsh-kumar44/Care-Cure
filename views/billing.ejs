@@ -4,25 +4,27 @@
   <title>Billing | Care & Cure</title>
   <link rel="stylesheet" href="/style.css">
   <style>
-    .patient-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .patient-grid select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; outline: none; }
-    .medicine-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 10px; align-items: center; margin-bottom: 10px; }
-    .medicine-row select { padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; width: 100%; }
-    .medicine-row input { text-align: center; }
-    .medicine-row .info-cell { background: #f0f4f8; border-radius: 8px; padding: 10px; font-size: 13px; color: #555; text-align: center; border: 1px solid #ddd; }
-    .medicine-row .remove-btn { background: #e74c3c; color: white; border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-size: 16px; }
-    .medicine-row .remove-btn:hover { background: #c0392b; }
-    .col-headers { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 10px; margin-bottom: 6px; font-size: 12px; color: #888; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px; padding: 0 2px; }
-    #add-row-btn { background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; margin-bottom: 16px; }
-    #add-row-btn:hover { background: #219150; }
-    .summary-box { background: #f8f9fa; border-radius: 10px; padding: 16px 20px; margin-top: 16px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e8edf2; }
-    .summary-box .label { font-size: 16px; color: #555; }
-    .summary-box .amount { font-size: 24px; font-weight: 700; color: #1a1a1a; }
-    #generate-btn { padding: 13px 36px; font-size: 16px; background: #4facfe; color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 16px; transition: 0.3s; }
-    #generate-btn:hover { background: #2f80ed; }
-    #generate-btn:disabled { background: #aaa; cursor: not-allowed; }
-    #error-msg { background: #ff4d4d; color: white; padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; display: none; font-size: 14px; }
-    #success-msg { background: #27ae60; color: white; padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; display: none; font-size: 14px; }
+    .patient-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .patient-grid select { width:100%; padding:12px; border-radius:8px; border:1px solid #ddd; font-size:14px; outline:none; transition:0.3s; }
+    .patient-grid select:focus { border-color:#4facfe; box-shadow:0 0 6px rgba(79,172,254,0.4); }
+    .col-headers { display:grid; grid-template-columns:2fr 1fr 1fr 1fr auto; gap:10px; margin-bottom:6px; font-size:12px; color:#888; font-weight:500; text-transform:uppercase; letter-spacing:0.3px; }
+    .medicine-row { display:grid; grid-template-columns:2fr 1fr 1fr 1fr auto; gap:10px; align-items:center; margin-bottom:10px; }
+    .medicine-row select { padding:10px; border-radius:8px; border:1px solid #ddd; font-size:14px; width:100%; }
+    .medicine-row input { text-align:center; }
+    .info-cell { background:#f0f4f8; border-radius:8px; padding:10px; font-size:13px; color:#555; text-align:center; border:1px solid #ddd; min-height:42px; display:flex; align-items:center; justify-content:center; }
+    .remove-btn { background:#e74c3c; color:white; border:none; border-radius:8px; padding:10px 14px; cursor:pointer; font-size:16px; }
+    .remove-btn:hover { background:#c0392b; }
+    #add-row-btn { background:#27ae60; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-size:14px; margin-bottom:16px; }
+    #add-row-btn:hover { background:#219150; }
+    .summary-box { background:#f8f9fa; border-radius:10px; padding:16px 20px; margin-top:16px; display:flex; justify-content:space-between; align-items:center; border:1px solid #e8edf2; }
+    .summary-box .label { font-size:16px; color:#555; }
+    .summary-box .amount { font-size:24px; font-weight:700; color:#1a1a1a; }
+    #generate-btn { padding:13px 36px; font-size:16px; background:#4facfe; color:white; border:none; border-radius:8px; cursor:pointer; margin-top:16px; transition:0.3s; }
+    #generate-btn:hover { background:#2f80ed; }
+    #generate-btn:disabled { background:#aaa; cursor:not-allowed; }
+    #error-msg { background:#ff4d4d; color:white; padding:12px 16px; border-radius:8px; margin-bottom:12px; display:none; font-size:14px; }
+    .datetime-bar { font-size:14px; color:#666; background:white; border-radius:10px; padding:12px 20px; margin-top:12px; box-shadow:0 2px 8px rgba(0,0,0,0.06); display:flex; align-items:center; gap:6px; max-width:1000px; width:100%; }
+    .datetime-bar b { color:#1a1a1a; }
   </style>
 </head>
 <body>
@@ -41,10 +43,14 @@
   <div class="main">
     <h1 class="page-title">Bill Generator</h1>
 
-    <div id="error-msg"></div>
-    <div id="success-msg"></div>
+    <div class="datetime-bar">
+      Date: <b id="live-date">--/--/----</b>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      Time: <b id="live-time">--:--:--</b>
+    </div>
 
-    <!-- Patient Details -->
+    <div id="error-msg"></div>
+
     <div class="form-box">
       <h2>Patient Details</h2>
       <div class="patient-grid">
@@ -60,27 +66,21 @@
       </div>
     </div>
 
-    <!-- Medicine Rows -->
     <div class="form-box">
       <h2>Add Medicines</h2>
-
       <div class="col-headers">
         <span>Medicine</span>
         <span style="text-align:center">Tablets</span>
         <span style="text-align:center">Available</span>
-        <span style="text-align:center">Amount (₹)</span>
+        <span style="text-align:center">Amount (Rs)</span>
         <span></span>
       </div>
-
       <div id="medicine-rows"></div>
-
       <button id="add-row-btn" onclick="addRow()">+ Add Medicine</button>
-
       <div class="summary-box">
         <span class="label">Grand Total</span>
-        <span class="amount">₹<span id="grand-total">0.00</span></span>
+        <span class="amount">Rs <span id="grand-total">0.00</span></span>
       </div>
-
       <button id="generate-btn" onclick="generateBill()">Generate &amp; Print Bill</button>
     </div>
   </div>
@@ -89,188 +89,150 @@
 <script>
   let medicines = [];
 
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('live-date').textContent =
+      pad(now.getDate()) + '/' + pad(now.getMonth() + 1) + '/' + now.getFullYear();
+    document.getElementById('live-time').textContent =
+      pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
   fetch('/api/bill/medicines-list')
     .then(r => r.json())
-    .then(data => {
-      medicines = data;
-      addRow();
-    })
+    .then(data => { medicines = data; addRow(); })
     .catch(() => showError('Failed to load medicines. Please refresh.'));
 
   function addRow() {
     const container = document.getElementById('medicine-rows');
     const idx = Date.now();
-
     const row = document.createElement('div');
     row.className = 'medicine-row';
     row.id = 'row-' + idx;
 
-    // Medicine select
     const select = document.createElement('select');
     select.innerHTML = '<option value="">-- Select Medicine --</option>' +
       medicines.map(m => {
-        const totalTablets = m.strips * m.tabletsPerStrip;
-        return `<option value="${m._id}"
-          data-price="${m.price}"
-          data-strips="${m.strips}"
-          data-tps="${m.tabletsPerStrip}"
-          data-total="${totalTablets}"
-          data-ppt="${(m.price / m.tabletsPerStrip).toFixed(2)}">
-          ${m.name} (${totalTablets} tablets available)
-        </option>`;
+        const total = m.strips * m.tabletsPerStrip;
+        const ppt = (m.price / m.tabletsPerStrip).toFixed(2);
+        return `<option value="${m._id}" data-total="${total}" data-ppt="${ppt}">
+          ${m.name} (${total} tablets available)</option>`;
       }).join('');
     select.onchange = () => calcRow(idx);
 
-    // Tablets input
-    const tabletsInput = document.createElement('input');
-    tabletsInput.type = 'number';
-    tabletsInput.placeholder = 'Qty';
-    tabletsInput.min = 1;
-    tabletsInput.id = 'tablets-' + idx;
-    tabletsInput.oninput = () => calcRow(idx);
+    const tabInput = document.createElement('input');
+    tabInput.type = 'number'; tabInput.placeholder = 'Qty'; tabInput.min = 1;
+    tabInput.id = 'tablets-' + idx;
+    tabInput.oninput = () => calcRow(idx);
 
-    // Available display
-    const availableCell = document.createElement('div');
-    availableCell.className = 'info-cell';
-    availableCell.id = 'avail-' + idx;
-    availableCell.textContent = '-';
+    const availCell = document.createElement('div');
+    availCell.className = 'info-cell'; availCell.id = 'avail-' + idx;
+    availCell.textContent = '-';
 
-    // Total display
     const totalCell = document.createElement('div');
-    totalCell.className = 'info-cell';
-    totalCell.id = 'rowtotal-' + idx;
+    totalCell.className = 'info-cell'; totalCell.id = 'rowtotal-' + idx;
     totalCell.textContent = '-';
 
-    // Remove button
     const removeBtn = document.createElement('button');
-    removeBtn.className = 'remove-btn';
-    removeBtn.textContent = '✕';
+    removeBtn.className = 'remove-btn'; removeBtn.textContent = '✕';
     removeBtn.onclick = () => { row.remove(); calcGrand(); };
 
-    row.appendChild(select);
-    row.appendChild(tabletsInput);
-    row.appendChild(availableCell);
-    row.appendChild(totalCell);
+    row.appendChild(select); row.appendChild(tabInput);
+    row.appendChild(availCell); row.appendChild(totalCell);
     row.appendChild(removeBtn);
     container.appendChild(row);
   }
 
   function calcRow(idx) {
     const row = document.getElementById('row-' + idx);
-    const select = row.querySelector('select');
-    const opt = select.selectedOptions[0];
+    const opt = row.querySelector('select').selectedOptions[0];
     const tablets = Number(document.getElementById('tablets-' + idx).value);
-    const totalAvailable = Number(opt?.dataset.total || 0);
-    const pricePerTablet = Number(opt?.dataset.ppt || 0);
-
-    const availCell = document.getElementById('avail-' + idx);
-    const totalCell = document.getElementById('rowtotal-' + idx);
+    const avail = Number(opt?.dataset.total || 0);
+    const ppt = Number(opt?.dataset.ppt || 0);
+    const ac = document.getElementById('avail-' + idx);
+    const tc = document.getElementById('rowtotal-' + idx);
 
     if (!opt?.value) {
-      availCell.textContent = '-';
-      totalCell.textContent = '-';
-      calcGrand();
-      return;
+      ac.textContent = '-'; ac.style.color = '#555';
+      tc.textContent = '-'; tc.style.color = '#555';
+      calcGrand(); return;
     }
-
-    availCell.textContent = totalAvailable + ' tabs';
-
-    if (tablets > totalAvailable) {
-      availCell.style.color = '#e74c3c';
-      availCell.style.fontWeight = '700';
-      totalCell.textContent = '⚠ Insufficient';
-      totalCell.style.color = '#e74c3c';
+    ac.textContent = avail + ' tabs';
+    if (tablets > avail) {
+      ac.style.color = '#e74c3c'; ac.style.fontWeight = '700';
+      tc.textContent = 'Insufficient'; tc.style.color = '#e74c3c';
+    } else if (tablets > 0) {
+      ac.style.color = '#27ae60'; ac.style.fontWeight = '600';
+      tc.textContent = 'Rs ' + (tablets * ppt).toFixed(2); tc.style.color = '#1a1a1a';
     } else {
-      availCell.style.color = '#27ae60';
-      availCell.style.fontWeight = '600';
-      const amount = (tablets * pricePerTablet).toFixed(2);
-      totalCell.textContent = '₹' + amount;
-      totalCell.style.color = '#1a1a1a';
+      tc.textContent = '-'; tc.style.color = '#555';
     }
-
     calcGrand();
   }
 
   function calcGrand() {
-    let grand = 0;
-    let hasError = false;
+    let grand = 0, err = false;
     document.querySelectorAll('[id^="rowtotal-"]').forEach(el => {
-      if (el.textContent.includes('⚠')) { hasError = true; return; }
-      const val = parseFloat(el.textContent.replace('₹', '')) || 0;
-      grand += val;
+      if (el.textContent === 'Insufficient') { err = true; return; }
+      grand += parseFloat(el.textContent.replace('Rs ', '')) || 0;
     });
-    document.getElementById('grand-total').textContent = hasError ? '---' : grand.toFixed(2);
+    document.getElementById('grand-total').textContent = err ? '---' : grand.toFixed(2);
   }
 
-async function generateBill() {
-  const patientName = document.getElementById('patientName').value.trim();
-  const patientAge = document.getElementById('patientAge').value.trim();
-  const patientPhone = document.getElementById('patientPhone').value.trim();
-  const patientGender = document.getElementById('patientGender').value;
+  async function generateBill() {
+    const patientName = document.getElementById('patientName').value.trim();
+    const patientAge = document.getElementById('patientAge').value.trim();
+    const patientPhone = document.getElementById('patientPhone').value.trim();
+    const patientGender = document.getElementById('patientGender').value;
 
-  if (!patientName || !patientAge) {
-    showError('Please fill in patient name and age.');
-    return;
-  }
+    if (!patientName || !patientAge) { showError('Please fill patient name and age.'); return; }
 
-  const rows = document.querySelectorAll('.medicine-row');
-  const items = [];
-
-  for (const row of rows) {
-    const select = row.querySelector('select');
-    const tabletsInput = row.querySelector('input[type="number"]');
-
-    const medId = select.value;
-    const tablets = Number(tabletsInput.value);
-
-    if (!medId || !tablets || tablets <= 0) continue;
-
-    items.push({ medicineId: medId, tablets });
-  }
-
-  if (items.length === 0) {
-    showError('Please add at least one medicine.');
-    return;
-  }
-
-  console.log("DEBUG DATA:", { patientName, patientAge, items });
-
-  const btn = document.getElementById('generate-btn');
-  btn.textContent = 'Generating...';
-  btn.disabled = true;
-
-  try {
-    const res = await fetch('/api/bill/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ patientName, patientAge, patientPhone, patientGender, items })
-    });
-
-    const data = await res.json();
-
-    if (data.success) {
-      window.open('/print-bill/' + data.billId, '_blank');
-      setTimeout(() => location.reload(), 500);
-    } else {
-      showError(data.error || 'Something went wrong.');
+    const items = [];
+    for (const row of document.querySelectorAll('.medicine-row')) {
+      const opt = row.querySelector('select').selectedOptions[0];
+      const tablets = Number(row.querySelector('input[type="number"]').value);
+      const medId = row.querySelector('select').value;
+      const avail = Number(opt?.dataset.total || 0);
+      if (!medId || !tablets) continue;
+      if (tablets > avail) {
+        showError(`Not enough tablets for "${opt.text.split('(')[0].trim()}". Available: ${avail}`);
+        return;
+      }
+      items.push({ medicineId: medId, tablets });
     }
 
-  } catch (err) {
-    console.error(err);
-    showError('Network error.');
-  }
+    if (items.length === 0) { showError('Please add at least one medicine.'); return; }
 
-  btn.textContent = 'Generate & Print Bill';
-  btn.disabled = false;
-}
+    const btn = document.getElementById('generate-btn');
+    btn.textContent = 'Generating...'; btn.disabled = true;
+
+    try {
+      const res = await fetch('/api/bill/generate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patientName, patientAge, patientPhone, patientGender, items })
+      });
+      const data = await res.json();
+      if (data.success) {
+        window.open('/print-bill/' + data.billId, '_blank');
+        setTimeout(() => location.reload(), 500);
+      } else {
+        showError(data.error || 'Something went wrong.');
+        btn.textContent = 'Generate & Print Bill'; btn.disabled = false;
+      }
+    } catch {
+      showError('Network error. Please try again.');
+      btn.textContent = 'Generate & Print Bill'; btn.disabled = false;
+    }
+  }
 
   function showError(msg) {
     const el = document.getElementById('error-msg');
-    el.textContent = msg;
-    el.style.display = 'block';
+    el.textContent = msg; el.style.display = 'block';
     setTimeout(() => el.style.display = 'none', 5000);
   }
 </script>
-
 </body>
 </html>

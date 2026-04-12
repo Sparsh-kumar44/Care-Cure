@@ -8,8 +8,7 @@
 
 <div class="container">
 
-  <!-- Sidebar -->
-   <div class="sidebar">
+  <div class="sidebar">
     <h2>Care &amp; Cure</h2>
     <a href="/dashboard">Dashboard</a>
     <a href="/medicines">Medicines</a>
@@ -19,12 +18,10 @@
     <a href="/logout">Logout</a>
   </div>
 
-  <!-- Main Content -->
   <div class="main">
 
     <h2 class="page-title">Welcome <%= user ? user.name + ' !' : '' %></h2>
 
-    <!-- Stats Cards -->
     <div class="cards">
       <div class="card">
         <h3>Total Medicines</h3>
@@ -40,38 +37,40 @@
       </div>
     </div>
 
-    <!-- Quick Actions -->
     <div class="form-box">
       <h2>Quick Actions</h2>
       <div class="btn-group">
         <a href="/medicines"><button>Add / Manage Medicines</button></a>
         <a href="/employees"><button>Manage Employees</button></a>
+        <a href="/billing"><button>New Bill</button></a>
       </div>
     </div>
 
-    <!-- Recent Medicines -->
     <div class="form-box">
       <h2>Recent Medicines</h2>
       <table>
         <tr>
           <th>ID</th>
           <th>Name</th>
-          <th>Qty</th>
+          <th>Total Tablets</th>
           <th>Expiry</th>
         </tr>
         <% if (medicines && medicines.length > 0) { %>
-          <% medicines.forEach(m => { %>
+          <% medicines.forEach(m => {
+            const d = new Date(m.expiry);
+            const dd = String(d.getDate()).padStart(2,'0');
+            const mm = String(d.getMonth()+1).padStart(2,'0');
+            const yyyy = d.getFullYear();
+          %>
             <tr>
               <td><%= m.medId %></td>
               <td><%= m.name %></td>
-              <td><%= m.quantity %></td>
-              <td><%= new Date(m.expiry).toDateString() %></td>
+              <td><%= (m.strips || 0) * (m.tabletsPerStrip || 0) %></td>
+              <td><%= dd %>/<%= mm %>/<%= yyyy %></td>
             </tr>
           <% }) %>
         <% } else { %>
-          <tr>
-            <td colspan="4">No medicines found</td>
-          </tr>
+          <tr><td colspan="4">No medicines found</td></tr>
         <% } %>
       </table>
     </div>

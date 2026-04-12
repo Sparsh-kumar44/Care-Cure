@@ -4,13 +4,22 @@
   <title>Medicines | Care & Cure</title>
   <link rel="stylesheet" href="/style.css">
   <style>
+    .filter-bar { display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+    .filter-bar select, .filter-bar input { padding:9px 14px; border-radius:8px; border:1px solid #ddd; font-size:14px; outline:none; }
+    .filter-bar select:focus, .filter-bar input:focus { border-color:#4facfe; }
+    .filter-label { font-size:13px; color:#666; font-weight:500; }
+    .badge { display:inline-block; background:#e8f4fd; color:#2f80ed; font-size:12px; font-weight:600; padding:3px 10px; border-radius:20px; margin-left:8px; }
+    .expired-row td { background:#fff0f0; }
+    .expiring-row td { background:#fffbf0; }
+    .legend { display:flex; gap:16px; font-size:12px; color:#666; margin-bottom:12px; align-items:center; }
+    .legend-dot { width:12px; height:12px; border-radius:3px; display:inline-block; margin-right:4px; vertical-align:middle; }
     .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:999; justify-content:center; align-items:center; }
     .modal-overlay.active { display:flex; }
     .modal { background:white; padding:32px; border-radius:16px; width:360px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
     .modal h3 { font-size:18px; margin-bottom:8px; color:#1a1a1a; }
     .modal p { color:#666; font-size:14px; margin-bottom:20px; }
     .modal input { width:100%; padding:12px; border-radius:8px; border:1px solid #ddd; font-size:14px; margin-bottom:12px; text-align:center; }
-    .modal-btns { display:flex; gap:10px; justify-content:center; }
+    .modal-btns { display:flex; gap:10px; }
     .modal-btns button { flex:1; padding:11px; border-radius:8px; border:none; cursor:pointer; font-size:14px; font-weight:500; }
     .btn-cancel-modal { background:#f0f0f0; color:#333; }
     .btn-confirm-delete { background:#e74c3c; color:white; }
@@ -18,8 +27,9 @@
   </style>
 </head>
 <body>
+
 <div class="container">
-   <div class="sidebar">
+  <div class="sidebar">
     <h2>Care &amp; Cure</h2>
     <a href="/dashboard">Dashboard</a>
     <a href="/medicines">Medicines</a>
@@ -28,8 +38,10 @@
     <a href="/bills">Bill History</a>
     <a href="/logout">Logout</a>
   </div>
+
   <div class="main">
-    <h1 class="page-title">Medicines</h1>
+    <h1 class="page-title">Medicines <span class="badge" id="med-count">0</span></h1>
+
     <div class="form-box">
       <h2>Add Medicine</h2>
       <form method="POST" action="/api/employee/add-medicine">
@@ -43,18 +55,60 @@
         <button type="submit">Add Medicine</button>
       </form>
     </div>
+
     <div class="form-box">
       <h2>All Medicines</h2>
+
+      <div class="filter-bar">
+        <span class="filter-label">Sort by Expiry:</span>
+        <select id="sort-expiry" onchange="sortAndFilter()">
+          <option value="none">Default</option>
+          <option value="asc">Earliest First</option>
+          <option value="desc">Latest First</option>
+        </select>
+        <input type="text" id="med-search" placeholder="Search medicine name..." oninput="sortAndFilter()" style="flex:1; max-width:240px;">
+      </div>
+
+      <div class="legend">
+        <span><span class="legend-dot" style="background:#ffd5d5;"></span>Expired</span>
+        <span><span class="legend-dot" style="background:#fff3cd;"></span>Expiring within 30 days</span>
+      </div>
+
       <table>
-        <tr>
-          <th>ID</th><th>Name</th><th>Strips</th><th>Tabs/Strip</th>
-          <th>Total Tablets</th><th>Price/Strip</th><th>Price/Tablet</th><th>Expiry</th><th>Actions</th>
-        </tr>
-        <% if (medicines.length === 0) { %>
-          <tr><td colspan="9">No medicines found</td></tr>
-        <% } %>
-        <% medicines.forEach(m => { %>
+        <thead>
           <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Strips</th>
+            <th>Tabs/Strip</th>
+            <th>Total Tablets</th>
+            <th>Price/Strip</th>
+            <th>Price/Tablet</th>
+            <th>Expiry</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="med-tbody">
+          <%
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const in30 = new Date(today);
+            in30.setDate(today.getDate() + 30);
+          %>
+          <% medicines.forEach(m => {
+            const exp = new Date(m.expiry);
+            exp.setHours(0,0,0,0);
+            const dd = String(exp.getDate()).padStart(2,'0');
+            const mm2 = String(exp.getMonth()+1).padStart(2,'0');
+            const yyyy = exp.getFullYear();
+            const dateStr = dd + '/' + mm2 + '/' + yyyy;
+            const isExpired = exp < today;
+            const isExpiring = !isExpired && exp <= in30;
+            const rowClass = isExpired ? 'expired-row' : isExpiring ? 'expiring-row' : '';
+          %>
+          <tr class="<%= rowClass %>"
+              data-expiry="<%= exp.getTime() %>"
+              data-name="<%= m.name.toLowerCase() %>">
             <td><%= m.medId %></td>
             <td><%= m.name %></td>
             <td><%= m.strips %></td>
@@ -62,18 +116,26 @@
             <td><strong><%= m.strips * m.tabletsPerStrip %></strong></td>
             <td>Rs <%= m.price %></td>
             <td>Rs <%= (m.price / m.tabletsPerStrip).toFixed(2) %></td>
-            <td><%= new Date(m.expiry).toDateString() %></td>
+            <td>
+              <%= dateStr %>
+              <% if (isExpired) { %> <span style="color:#e74c3c;font-size:11px;font-weight:600;">(Expired)</span>
+              <% } else if (isExpiring) { %> <span style="color:#e67e22;font-size:11px;font-weight:600;">(Soon)</span>
+              <% } %>
+            </td>
             <td>
               <a href="/edit-med/<%= m._id %>" class="action-edit">Edit</a>
               <a href="#" class="action-edit" style="color:#e74c3c;"
                  onclick="askDelete('<%= m._id %>', '<%= m.name %>'); return false;">Delete</a>
             </td>
           </tr>
-        <% }) %>
+          <% }) %>
+        </tbody>
       </table>
     </div>
   </div>
 </div>
+
+<!-- Delete Modal -->
 <div class="modal-overlay" id="deleteModal">
   <div class="modal">
     <h3>Confirm Delete</h3>
@@ -86,8 +148,36 @@
     </div>
   </div>
 </div>
+
 <script>
   let deleteTarget = null;
+
+  function sortAndFilter() {
+    const sort = document.getElementById('sort-expiry').value;
+    const search = document.getElementById('med-search').value.toLowerCase().trim();
+    const tbody = document.getElementById('med-tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    let visible = 0;
+
+    rows.forEach(r => {
+      const nameMatch = !search || r.dataset.name.includes(search);
+      r.style.display = nameMatch ? '' : 'none';
+      if (nameMatch) visible++;
+    });
+
+    document.getElementById('med-count').textContent = visible;
+
+    if (sort !== 'none') {
+      const sorted = rows.filter(r => r.style.display !== 'none')
+        .sort((a, b) => sort === 'asc'
+          ? Number(a.dataset.expiry) - Number(b.dataset.expiry)
+          : Number(b.dataset.expiry) - Number(a.dataset.expiry));
+      sorted.forEach(r => tbody.appendChild(r));
+    }
+  }
+
+  sortAndFilter();
+
   function askDelete(id, name) {
     deleteTarget = id;
     document.getElementById('modal-desc').textContent = 'Enter your password to delete: "' + name + '"';
@@ -96,20 +186,21 @@
     document.getElementById('deleteModal').classList.add('active');
     setTimeout(() => document.getElementById('modal-password').focus(), 100);
   }
+
   function closeModal() {
     document.getElementById('deleteModal').classList.remove('active');
     deleteTarget = null;
   }
+
   async function confirmDelete() {
     const password = document.getElementById('modal-password').value;
     if (!password) return;
-    const verifyRes = await fetch('/api/auth/verify-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const vr = await fetch('/api/auth/verify-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password })
     });
-    const verifyData = await verifyRes.json();
-    if (!verifyData.valid) {
+    const vd = await vr.json();
+    if (!vd.valid) {
       document.getElementById('modal-error').style.display = 'block';
       document.getElementById('modal-password').value = '';
       return;
@@ -120,9 +211,11 @@
     document.body.appendChild(form);
     form.submit();
   }
-  document.getElementById('deleteModal').addEventListener('click', function(e) {
-    if (e.target === this) closeModal();
+
+  document.getElementById('deleteModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('deleteModal')) closeModal();
   });
 </script>
+
 </body>
 </html>

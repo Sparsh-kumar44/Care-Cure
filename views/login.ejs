@@ -12,7 +12,7 @@
 
     <div class="logo-box">
       <img src="/logo.png" alt="Clinic Logo" class="logo">
-      <h2>Shri Ram Chandra Prasad Care & Cure Clinic</h2>
+      <h2>Shri Ram Chandra Prasad Care &amp; Cure Clinic</h2>
       <p class="subtitle">Clinic Management System</p>
     </div>
 
@@ -21,14 +21,11 @@
     <% } %>
 
     <form method="POST" action="/api/auth/login">
-
       <input type="text" name="empId" placeholder="Employee ID" required>
-
       <div class="password-box">
         <input type="password" id="password" name="password" placeholder="Password" required>
         <span class="toggle-pass" onclick="togglePassword()">Show</span>
       </div>
-
       <button type="submit">Login</button>
     </form>
 

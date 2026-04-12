@@ -10,7 +10,7 @@
     .modal h3 { font-size:18px; margin-bottom:8px; color:#1a1a1a; }
     .modal p { color:#666; font-size:14px; margin-bottom:20px; }
     .modal input { width:100%; padding:12px; border-radius:8px; border:1px solid #ddd; font-size:14px; margin-bottom:12px; text-align:center; }
-    .modal-btns { display:flex; gap:10px; justify-content:center; }
+    .modal-btns { display:flex; gap:10px; }
     .modal-btns button { flex:1; padding:11px; border-radius:8px; border:none; cursor:pointer; font-size:14px; font-weight:500; }
     .btn-cancel-modal { background:#f0f0f0; color:#333; }
     .btn-confirm-delete { background:#e74c3c; color:white; }
@@ -18,8 +18,9 @@
   </style>
 </head>
 <body>
+
 <div class="container">
-   <div class="sidebar">
+  <div class="sidebar">
     <h2>Care &amp; Cure</h2>
     <a href="/dashboard">Dashboard</a>
     <a href="/medicines">Medicines</a>
@@ -28,11 +29,14 @@
     <a href="/bills">Bill History</a>
     <a href="/logout">Logout</a>
   </div>
+
   <div class="main">
     <h1 class="page-title">Employees</h1>
+
     <% if (typeof error !== 'undefined' && error) { %>
       <div class="error-box"><%= error %></div>
     <% } %>
+
     <% if (user && user.role === 'admin') { %>
     <div class="form-box">
       <h2>Add Employee</h2>
@@ -46,6 +50,7 @@
       </form>
     </div>
     <% } %>
+
     <div class="form-box">
       <h2>All Employees</h2>
       <table>
@@ -73,6 +78,8 @@
     </div>
   </div>
 </div>
+
+<!-- Delete Modal -->
 <div class="modal-overlay" id="deleteModal">
   <div class="modal">
     <h3>Confirm Delete</h3>
@@ -85,8 +92,10 @@
     </div>
   </div>
 </div>
+
 <script>
   let deleteTarget = null;
+
   function askDelete(id, name) {
     deleteTarget = id;
     document.getElementById('modal-desc').textContent = 'Enter your password to delete: "' + name + '"';
@@ -95,19 +104,21 @@
     document.getElementById('deleteModal').classList.add('active');
     setTimeout(() => document.getElementById('modal-password').focus(), 100);
   }
+
   function closeModal() {
     document.getElementById('deleteModal').classList.remove('active');
     deleteTarget = null;
   }
+
   async function confirmDelete() {
     const password = document.getElementById('modal-password').value;
     if (!password) return;
-    const verifyRes = await fetch('/api/auth/verify-password', {
+    const vr = await fetch('/api/auth/verify-password', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password })
     });
-    const verifyData = await verifyRes.json();
-    if (!verifyData.valid) {
+    const vd = await vr.json();
+    if (!vd.valid) {
       document.getElementById('modal-error').style.display = 'block';
       document.getElementById('modal-password').value = '';
       return;
@@ -118,9 +129,11 @@
     document.body.appendChild(form);
     form.submit();
   }
-  document.getElementById('deleteModal').addEventListener('click', function(e) {
-    if (e.target === this) closeModal();
+
+  document.getElementById('deleteModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('deleteModal')) closeModal();
   });
 </script>
+
 </body>
 </html>

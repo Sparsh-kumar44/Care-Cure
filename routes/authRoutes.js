@@ -7,12 +7,23 @@ const User = require('../models/User');
 router.post('/login', async (req, res) => {
   try {
     const { empId, password } = req.body;
+
+    console.log("👉 LOGIN INPUT:", empId);
+
+    const allUsers = await User.find();
+    console.log("👉 USERS IN DB:", allUsers);
+
     const user = await User.findOne({ empId });
+    console.log("👉 FOUND USER:", user);
+
     if (!user) return res.redirect('/?error=User not found');
+
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.redirect('/?error=Wrong password');
-    req.session.user = user.toObject(); // store plain object
+
+    req.session.user = user.toObject();
     res.redirect('/dashboard');
+
   } catch (err) {
     console.error(err);
     res.redirect('/?error=Something went wrong');

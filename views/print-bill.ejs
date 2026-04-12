@@ -1,157 +1,135 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Bill History | Care & Cure</title>
-  <link rel="stylesheet" href="/style.css">
+  <title>Bill #<%= bill.billNo %></title>
   <style>
-    .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:999; justify-content:center; align-items:center; }
-    .modal-overlay.active { display:flex; }
-    .modal { background:white; padding:32px; border-radius:16px; width:360px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
-    .modal h3 { font-size:18px; margin-bottom:8px; color:#1a1a1a; }
-    .modal p { color:#666; font-size:14px; margin-bottom:20px; }
-    .modal input { width:100%; padding:12px; border-radius:8px; border:1px solid #ddd; font-size:14px; margin-bottom:12px; text-align:center; }
-    .modal-btns { display:flex; gap:10px; justify-content:center; }
-    .modal-btns button { flex:1; padding:11px; border-radius:8px; border:none; cursor:pointer; font-size:14px; font-weight:500; }
-    .btn-cancel-modal { background:#f0f0f0; color:#333; }
-    .btn-confirm-delete { background:#e74c3c; color:white; }
-    .modal-error { color:#e74c3c; font-size:13px; margin-bottom:8px; display:none; }
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', sans-serif; }
+    body { background:#f0f0f0; display:flex; flex-direction:column; align-items:center; padding:30px; }
+    .bill-page { background:white; width:210mm; min-height:297mm; padding:30px 40px; box-shadow:0 0 20px rgba(0,0,0,0.15); }
+
+    .bill-header { text-align:center; border-bottom:3px double #111; padding-bottom:16px; margin-bottom:20px; }
+    .bill-header img { width:90px; height:90px; object-fit:contain; display:block; margin:0 auto 10px; }
+    .bill-header h1 { font-size:22px; font-weight:700; color:#111; }
+    .bill-header p { font-size:13px; color:#555; margin-top:4px; }
+
+    .bill-meta { display:flex; justify-content:space-between; margin-bottom:20px; font-size:14px; background:#f8f9fa; border-radius:8px; padding:14px 18px; }
+    .bill-meta div { line-height:2; }
+    .bill-meta strong { color:#111; display:inline-block; min-width:130px; }
+
+    table { width:100%; border-collapse:collapse; margin-bottom:20px; font-size:14px; }
+    thead tr { background:#1a1a1a; color:white; }
+    thead th { padding:11px 12px; text-align:left; font-weight:500; }
+    thead th:last-child { text-align:right; }
+    tbody tr { border-bottom:1px solid #eee; }
+    tbody tr:nth-child(even) { background:#f9f9f9; }
+    tbody td { padding:10px 12px; }
+    tbody td:last-child { text-align:right; font-weight:600; }
+
+    .totals { display:flex; justify-content:flex-end; margin-bottom:30px; }
+    .totals table { width:auto; min-width:220px; }
+    .totals .grand-row { background:#1a1a1a; color:white; }
+    .totals .grand-row td { font-size:16px; font-weight:700; padding:12px 16px; }
+    .totals td { padding:8px 16px; font-size:14px; }
+
+    .bill-footer { border-top:1px solid #ccc; padding-top:20px; display:flex; justify-content:space-between; align-items:flex-end; font-size:13px; color:#666; }
+    .signature-line { width:160px; border-top:1px solid #333; margin:50px auto 6px; }
+    .signature-box { text-align:center; }
+    .thank-you { text-align:center; margin-top:28px; font-size:13px; color:#999; font-style:italic; padding-top:16px; border-top:1px dashed #ddd; }
+
+    .print-btn { margin-top:20px; background:#4facfe; color:white; border:none; padding:14px 36px; border-radius:10px; font-size:15px; cursor:pointer; }
+    .print-btn:hover { background:#2f80ed; }
+
+    @media print {
+      body { background:white; padding:0; }
+      .bill-page { box-shadow:none; width:100%; padding:20px; }
+      .print-btn { display:none; }
+    }
   </style>
 </head>
 <body>
 
-<div class="container">
-   <div class="sidebar">
-    <h2>Care &amp; Cure</h2>
-    <a href="/dashboard">Dashboard</a>
-    <a href="/medicines">Medicines</a>
-    <a href="/employees">Employees</a>
-    <a href="/billing">Billing</a>
-    <a href="/bills">Bill History</a>
-    <a href="/logout">Logout</a>
+<div class="bill-page">
+
+  <div class="bill-header">
+    <img src="/logo.png" alt="Care & Cure Logo">
+    <h1>Shri Ram Chandra Prasad Care &amp; Cure Clinic</h1>
+    <p>Clinic Management System</p>
+    <p>Contact: +91 94150-71809</p>
   </div>
 
-  <div class="main">
-    <h1 class="page-title">Bill History</h1>
+  <%
+    const d = new Date(bill.createdAt);
+    const ist = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
+    const dd = String(ist.getUTCDate()).padStart(2,'0');
+    const mm = String(ist.getUTCMonth()+1).padStart(2,'0');
+    const yyyy = ist.getUTCFullYear();
+    const hh = String(ist.getUTCHours()).padStart(2,'0');
+    const min = String(ist.getUTCMinutes()).padStart(2,'0');
+    const ss = String(ist.getUTCSeconds()).padStart(2,'0');
+  %>
 
-    <div class="form-box">
-      <table>
+  <div class="bill-meta">
+    <div>
+      <strong>Patient Name:</strong> <%= bill.patientName %><br>
+      <strong>Age:</strong> <%= bill.patientAge %> years<br>
+      <% if (bill.patientGender) { %><strong>Gender:</strong> <%= bill.patientGender %><br><% } %>
+      <% if (bill.patientPhone) { %><strong>Phone:</strong> <%= bill.patientPhone %><br><% } %>
+    </div>
+    <div style="text-align:right;">
+      <strong>Bill No:</strong> #<%= bill.billNo %><br>
+      <strong>Date:</strong> <%= dd %>/<%= mm %>/<%= yyyy %><br>
+      <strong>Time:</strong> <%= hh %>:<%= min %>:<%= ss %> IST<br>
+      <strong>Generated By:</strong> <%= bill.generatedBy %>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Medicine</th>
+        <th>Tablets</th>
+        <th>Price / Tablet</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% bill.items.forEach((item, i) => { %>
         <tr>
-          <th>Bill No</th>
-          <th>Patient</th>
-          <th>Age</th>
-          <th>Gender</th>
-          <th>Phone</th>
-          <th>Items</th>
-          <th>Total</th>
-          <th>Date & Time</th>
-          <th>By</th>
-          <th>Actions</th>
+          <td><%= i + 1 %></td>
+          <td><%= item.name %></td>
+          <td><%= item.tablets %></td>
+          <td>Rs <%= item.pricePerTablet.toFixed(2) %></td>
+          <td>Rs <%= item.total.toFixed(2) %></td>
         </tr>
+      <% }) %>
+    </tbody>
+  </table>
 
-        <% if (bills.length === 0) { %>
-          <tr><td colspan="10">No bills generated yet</td></tr>
-        <% } %>
+  <div class="totals">
+    <table>
+      <tr class="grand-row">
+        <td>Grand Total</td>
+        <td>Rs <%= bill.grandTotal.toFixed(2) %></td>
+      </tr>
+    </table>
+  </div>
 
-        <% bills.forEach(b => { %>
-          <tr>
-            <td>#<%= b.billNo %></td>
-            <td><%= b.patientName %></td>
-            <td><%= b.patientAge %></td>
-            <td><%= b.patientGender || '-' %></td>
-            <td><%= b.patientPhone || '-' %></td>
-            <td><%= b.items.length %></td>
-            <td>₹<%= b.grandTotal.toFixed(2) %></td>
-
-            <!-- ✅ FIXED DATE + TIME -->
-            <td>
-              <%= new Date(b.createdAt).toLocaleDateString('en-GB') %>
-              <br>
-              <small>
-                <%= new Date(b.createdAt).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }) %>
-              </small>
-            </td>
-
-            <td><%= b.generatedBy %></td>
-
-            <td>
-              <a href="/print-bill/<%= b._id %>" target="_blank" class="action-edit">🖨️ Print</a>
-
-              <% if (user && user.role === 'admin') { %>
-                &nbsp;
-                <a href="#" class="action-edit" style="color:#e74c3c;"
-                   onclick="askDelete('<%= b._id %>', '#<%= b.billNo %> - <%= b.patientName %>'); return false;">
-                  🗑️ Delete
-                </a>
-              <% } %>
-            </td>
-          </tr>
-        <% }) %>
-
-      </table>
+  <div class="bill-footer">
+    <div>
+      <p>Generated by Care &amp; Cure System</p>
+      <p>This is a computer generated bill.</p>
+    </div>
+    <div class="signature-box">
+      <div class="signature-line"></div>
+      <p>Authorised Signature</p>
     </div>
   </div>
+
+  <p class="thank-you">Thank you for visiting Care &amp; Cure. Get well soon! 💊</p>
 </div>
 
-<!-- Modal -->
-<div class="modal-overlay" id="deleteModal">
-  <div class="modal">
-    <h3>Confirm Delete</h3>
-    <p id="modal-desc">Enter your admin password to delete this bill.</p>
-    <p class="modal-error" id="modal-error">Incorrect password. Try again.</p>
-    <input type="password" id="modal-password" placeholder="Enter your password">
-    <div class="modal-btns">
-      <button class="btn-cancel-modal" onclick="closeModal()">Cancel</button>
-      <button class="btn-confirm-delete" onclick="confirmDelete()">Delete</button>
-    </div>
-  </div>
-</div>
-
-<script>
-  let targetId = null;
-
-  function askDelete(id, label) {
-    targetId = id;
-    document.getElementById('modal-desc').textContent = `Enter your password to delete bill: ${label}`;
-    document.getElementById('modal-password').value = '';
-    document.getElementById('modal-error').style.display = 'none';
-    document.getElementById('deleteModal').classList.add('active');
-    setTimeout(() => document.getElementById('modal-password').focus(), 100);
-  }
-
-  function closeModal() {
-    document.getElementById('deleteModal').classList.remove('active');
-    targetId = null;
-  }
-
-  async function confirmDelete() {
-    const password = document.getElementById('modal-password').value;
-    if (!password) return;
-
-    const verifyRes = await fetch('/api/auth/verify-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password })
-    });
-
-    const verifyData = await verifyRes.json();
-    if (!verifyData.valid) {
-      document.getElementById('modal-error').style.display = 'block';
-      document.getElementById('modal-password').value = '';
-      return;
-    }
-
-    const res = await fetch('/api/bill/delete/' + targetId, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
-      closeModal();
-      location.reload();
-    }
-  }
-
-  document.getElementById('deleteModal').addEventListener('click', function(e) {
-    if (e.target === this) closeModal();
-  });
-</script>
+<button class="print-btn" onclick="window.print()">Print Bill</button>
 
 </body>
 </html>

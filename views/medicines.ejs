@@ -18,11 +18,12 @@
     .modal { background:white; padding:32px; border-radius:16px; width:360px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
     .modal h3 { font-size:18px; margin-bottom:8px; color:#1a1a1a; }
     .modal p { color:#666; font-size:14px; margin-bottom:20px; }
-    .modal input { width:100%; padding:12px; border-radius:8px; border:1px solid #ddd; font-size:14px; margin-bottom:12px; text-align:center; }
+    .modal input { width:100%; padding:12px; border-radius:8px; border:1px solid #ddd; font-size:14px; margin-bottom:12px; text-align:center; box-sizing:border-box; }
     .modal-btns { display:flex; gap:10px; }
     .modal-btns button { flex:1; padding:11px; border-radius:8px; border:none; cursor:pointer; font-size:14px; font-weight:500; }
     .btn-cancel-modal { background:#f0f0f0; color:#333; }
     .btn-confirm-delete { background:#e74c3c; color:white; }
+    .btn-confirm-edit { background:#2563eb; color:white; }
     .modal-error { color:#e74c3c; font-size:13px; margin-bottom:8px; display:none; }
   </style>
 </head>
@@ -123,7 +124,10 @@
               <% } %>
             </td>
             <td>
-              <a href="/edit-med/<%= m._id %>" class="action-edit">Edit</a>
+              <!-- Edit: password required -->
+              <a href="#" class="action-edit"
+                 onclick="askEdit('<%= m._id %>', '<%= m.name %>'); return false;">Edit</a>
+              <!-- Delete: password required, open to all -->
               <a href="#" class="action-edit" style="color:#e74c3c;"
                  onclick="askDelete('<%= m._id %>', '<%= m.name %>'); return false;">Delete</a>
             </td>
@@ -143,15 +147,31 @@
     <p class="modal-error" id="modal-error">Incorrect password. Try again.</p>
     <input type="password" id="modal-password" placeholder="Enter your password">
     <div class="modal-btns">
-      <button class="btn-cancel-modal" onclick="closeModal()">Cancel</button>
+      <button class="btn-cancel-modal" onclick="closeDeleteModal()">Cancel</button>
       <button class="btn-confirm-delete" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h3>Confirm Edit</h3>
+    <p id="edit-modal-desc">Enter your password to edit this medicine.</p>
+    <p class="modal-error" id="edit-modal-error">Incorrect password. Try again.</p>
+    <input type="password" id="edit-modal-password" placeholder="Enter your password">
+    <div class="modal-btns">
+      <button class="btn-cancel-modal" onclick="closeEditModal()">Cancel</button>
+      <button class="btn-confirm-edit" onclick="confirmEdit()">Proceed</button>
     </div>
   </div>
 </div>
 
 <script>
   let deleteTarget = null;
+  let editTarget = null;
 
+  /* ── Sort & Filter ── */
   function sortAndFilter() {
     const sort = document.getElementById('sort-expiry').value;
     const search = document.getElementById('med-search').value.toLowerCase().trim();
@@ -178,6 +198,7 @@
 
   sortAndFilter();
 
+  /* ── Delete ── */
   function askDelete(id, name) {
     deleteTarget = id;
     document.getElementById('modal-desc').textContent = 'Enter your password to delete: "' + name + '"';
@@ -187,7 +208,7 @@
     setTimeout(() => document.getElementById('modal-password').focus(), 100);
   }
 
-  function closeModal() {
+  function closeDeleteModal() {
     document.getElementById('deleteModal').classList.remove('active');
     deleteTarget = null;
   }
@@ -213,7 +234,42 @@
   }
 
   document.getElementById('deleteModal').addEventListener('click', e => {
-    if (e.target === document.getElementById('deleteModal')) closeModal();
+    if (e.target === document.getElementById('deleteModal')) closeDeleteModal();
+  });
+
+  /* ── Edit ── */
+  function askEdit(id, name) {
+    editTarget = id;
+    document.getElementById('edit-modal-desc').textContent = 'Enter your password to edit: "' + name + '"';
+    document.getElementById('edit-modal-password').value = '';
+    document.getElementById('edit-modal-error').style.display = 'none';
+    document.getElementById('editModal').classList.add('active');
+    setTimeout(() => document.getElementById('edit-modal-password').focus(), 100);
+  }
+
+  function closeEditModal() {
+    document.getElementById('editModal').classList.remove('active');
+    editTarget = null;
+  }
+
+  async function confirmEdit() {
+    const password = document.getElementById('edit-modal-password').value;
+    if (!password) return;
+    const vr = await fetch('/api/auth/verify-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    const vd = await vr.json();
+    if (!vd.valid) {
+      document.getElementById('edit-modal-error').style.display = 'block';
+      document.getElementById('edit-modal-password').value = '';
+      return;
+    }
+    window.location.href = '/edit-med/' + editTarget;
+  }
+
+  document.getElementById('editModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('editModal')) closeEditModal();
   });
 </script>
 

@@ -9,7 +9,6 @@
     .patient-grid select:focus { border-color:#4facfe; box-shadow:0 0 6px rgba(79,172,254,0.4); }
     .col-headers { display:grid; grid-template-columns:2fr 1fr 1fr 1fr auto; gap:10px; margin-bottom:6px; font-size:12px; color:#888; font-weight:500; text-transform:uppercase; letter-spacing:0.3px; }
     .medicine-row { display:grid; grid-template-columns:2fr 1fr 1fr 1fr auto; gap:10px; align-items:center; margin-bottom:10px; }
-    .medicine-row select { padding:10px; border-radius:8px; border:1px solid #ddd; font-size:14px; width:100%; }
     .medicine-row input { text-align:center; }
     .info-cell { background:#f0f4f8; border-radius:8px; padding:10px; font-size:13px; color:#555; text-align:center; border:1px solid #ddd; min-height:42px; display:flex; align-items:center; justify-content:center; }
     .remove-btn { background:#e74c3c; color:white; border:none; border-radius:8px; padding:10px 14px; cursor:pointer; font-size:16px; }
@@ -25,6 +24,31 @@
     #error-msg { background:#ff4d4d; color:white; padding:12px 16px; border-radius:8px; margin-bottom:12px; display:none; font-size:14px; }
     .datetime-bar { font-size:14px; color:#666; background:white; border-radius:10px; padding:12px 20px; margin-top:12px; box-shadow:0 2px 8px rgba(0,0,0,0.06); display:flex; align-items:center; gap:6px; max-width:1000px; width:100%; }
     .datetime-bar b { color:#1a1a1a; }
+
+    /* ── Searchable medicine input ── */
+    .med-search-wrap { position:relative; }
+    .med-search-input {
+      width:100%; padding:10px 12px; border-radius:8px; border:1px solid #ddd;
+      font-size:14px; outline:none; box-sizing:border-box; transition:0.2s;
+    }
+    .med-search-input:focus { border-color:#4facfe; box-shadow:0 0 6px rgba(79,172,254,0.3); }
+    .med-dropdown {
+      display:none; position:absolute; top:calc(100% + 4px); left:0; right:0;
+      background:white; border:1px solid #ddd; border-radius:8px;
+      max-height:220px; overflow-y:auto; z-index:100;
+      box-shadow:0 8px 24px rgba(0,0,0,0.12);
+    }
+    .med-dropdown.open { display:block; }
+    .med-option {
+      padding:10px 14px; font-size:13px; cursor:pointer; border-bottom:1px solid #f0f0f0;
+      transition:background 0.15s;
+    }
+    .med-option:last-child { border-bottom:none; }
+    .med-option:hover, .med-option.highlighted { background:#f0f7ff; }
+    .med-option .med-name { font-weight:600; color:#1a1a1a; }
+    .med-option .med-meta { color:#888; font-size:12px; margin-top:2px; }
+    .med-option.no-results { color:#aaa; cursor:default; }
+    .med-option.no-results:hover { background:white; }
   </style>
 </head>
 <body>
@@ -113,16 +137,99 @@
     row.className = 'medicine-row';
     row.id = 'row-' + idx;
 
-    const select = document.createElement('select');
-    select.innerHTML = '<option value="">-- Select Medicine --</option>' +
-      medicines.map(m => {
-        const total = m.strips * m.tabletsPerStrip;
-        const ppt = (m.price / m.tabletsPerStrip).toFixed(2);
-        return `<option value="${m._id}" data-total="${total}" data-ppt="${ppt}">
-          ${m.name} (${total} tablets available)</option>`;
-      }).join('');
-    select.onchange = () => calcRow(idx);
+    // ── Searchable medicine picker ──
+    const wrap = document.createElement('div');
+    wrap.className = 'med-search-wrap';
 
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'med-search-input';
+    searchInput.placeholder = 'Search medicine...';
+    searchInput.autocomplete = 'off';
+    searchInput.dataset.selectedId = '';
+    searchInput.dataset.selectedPpt = '';
+    searchInput.dataset.selectedTotal = '';
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'med-dropdown';
+    dropdown.id = 'drop-' + idx;
+
+    let highlightIdx = -1;
+
+    function renderDropdown(query) {
+      const q = query.toLowerCase().trim();
+      const filtered = q
+        ? medicines.filter(m => m.name.toLowerCase().includes(q))
+        : medicines;
+
+      dropdown.innerHTML = '';
+      highlightIdx = -1;
+
+      if (filtered.length === 0) {
+        dropdown.innerHTML = '<div class="med-option no-results">No medicines found</div>';
+      } else {
+        filtered.forEach((m, i) => {
+          const total = m.strips * m.tabletsPerStrip;
+          const ppt = (m.price / m.tabletsPerStrip).toFixed(2);
+          const opt = document.createElement('div');
+          opt.className = 'med-option';
+          opt.innerHTML = `<div class="med-name">${m.name}</div>
+            <div class="med-meta">${total} tablets available &nbsp;|&nbsp; Rs ${ppt}/tablet</div>`;
+          opt.addEventListener('mousedown', e => {
+            e.preventDefault();
+            selectMedicine(m, total, ppt);
+          });
+          dropdown.appendChild(opt);
+        });
+      }
+      dropdown.classList.add('open');
+    }
+
+    function selectMedicine(m, total, ppt) {
+      searchInput.value = m.name;
+      searchInput.dataset.selectedId = m._id;
+      searchInput.dataset.selectedPpt = ppt;
+      searchInput.dataset.selectedTotal = total;
+      dropdown.classList.remove('open');
+      calcRow(idx);
+    }
+
+    function clearSelection() {
+      searchInput.dataset.selectedId = '';
+      searchInput.dataset.selectedPpt = '';
+      searchInput.dataset.selectedTotal = '';
+    }
+
+    searchInput.addEventListener('focus', () => renderDropdown(searchInput.value));
+    searchInput.addEventListener('input', () => { clearSelection(); renderDropdown(searchInput.value); calcRow(idx); });
+    searchInput.addEventListener('blur', () => setTimeout(() => dropdown.classList.remove('open'), 150));
+
+    // Keyboard nav
+    searchInput.addEventListener('keydown', e => {
+      const opts = dropdown.querySelectorAll('.med-option:not(.no-results)');
+      if (!opts.length) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        highlightIdx = Math.min(highlightIdx + 1, opts.length - 1);
+        opts.forEach((o, i) => o.classList.toggle('highlighted', i === highlightIdx));
+        opts[highlightIdx].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        highlightIdx = Math.max(highlightIdx - 1, 0);
+        opts.forEach((o, i) => o.classList.toggle('highlighted', i === highlightIdx));
+        opts[highlightIdx].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (highlightIdx >= 0 && opts[highlightIdx]) opts[highlightIdx].dispatchEvent(new Event('mousedown'));
+      } else if (e.key === 'Escape') {
+        dropdown.classList.remove('open');
+      }
+    });
+
+    wrap.appendChild(searchInput);
+    wrap.appendChild(dropdown);
+
+    // ── Tablets input ──
     const tabInput = document.createElement('input');
     tabInput.type = 'number'; tabInput.placeholder = 'Qty'; tabInput.min = 1;
     tabInput.id = 'tablets-' + idx;
@@ -140,22 +247,25 @@
     removeBtn.className = 'remove-btn'; removeBtn.textContent = '✕';
     removeBtn.onclick = () => { row.remove(); calcGrand(); };
 
-    row.appendChild(select); row.appendChild(tabInput);
-    row.appendChild(availCell); row.appendChild(totalCell);
+    row.appendChild(wrap);
+    row.appendChild(tabInput);
+    row.appendChild(availCell);
+    row.appendChild(totalCell);
     row.appendChild(removeBtn);
     container.appendChild(row);
   }
 
   function calcRow(idx) {
     const row = document.getElementById('row-' + idx);
-    const opt = row.querySelector('select').selectedOptions[0];
+    if (!row) return;
+    const searchInput = row.querySelector('.med-search-input');
     const tablets = Number(document.getElementById('tablets-' + idx).value);
-    const avail = Number(opt?.dataset.total || 0);
-    const ppt = Number(opt?.dataset.ppt || 0);
+    const avail = Number(searchInput.dataset.selectedTotal || 0);
+    const ppt = Number(searchInput.dataset.selectedPpt || 0);
     const ac = document.getElementById('avail-' + idx);
     const tc = document.getElementById('rowtotal-' + idx);
 
-    if (!opt?.value) {
+    if (!searchInput.dataset.selectedId) {
       ac.textContent = '-'; ac.style.color = '#555';
       tc.textContent = '-'; tc.style.color = '#555';
       calcGrand(); return;
@@ -192,13 +302,13 @@
 
     const items = [];
     for (const row of document.querySelectorAll('.medicine-row')) {
-      const opt = row.querySelector('select').selectedOptions[0];
+      const searchInput = row.querySelector('.med-search-input');
+      const medId = searchInput?.dataset.selectedId;
+      const avail = Number(searchInput?.dataset.selectedTotal || 0);
       const tablets = Number(row.querySelector('input[type="number"]').value);
-      const medId = row.querySelector('select').value;
-      const avail = Number(opt?.dataset.total || 0);
       if (!medId || !tablets) continue;
       if (tablets > avail) {
-        showError(`Not enough tablets for "${opt.text.split('(')[0].trim()}". Available: ${avail}`);
+        showError(`Not enough tablets for "${searchInput.value}". Available: ${avail}`);
         return;
       }
       items.push({ medicineId: medId, tablets });

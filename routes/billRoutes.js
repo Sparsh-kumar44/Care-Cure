@@ -22,7 +22,6 @@ router.post('/generate', auth, async (req, res) => {
   try {
     const { patientName, patientAge, patientPhone, patientGender, items } = req.body;
 
-    // ✅ Validation
     if (!patientName || !patientAge || !items || items.length === 0) {
       return res.status(400).json({ error: 'Missing required fields.' });
     }
@@ -33,7 +32,6 @@ router.post('/generate', auth, async (req, res) => {
     for (const item of items) {
       const tablets = Number(item.tablets);
 
-      // ✅ Validate ObjectId
       if (!mongoose.Types.ObjectId.isValid(item.medicineId)) {
         return res.status(400).json({ error: 'Invalid medicine ID' });
       }
@@ -56,12 +54,12 @@ router.post('/generate', auth, async (req, res) => {
 
       const pricePerTablet = med.price / med.tabletsPerStrip;
       const total = parseFloat((tablets * pricePerTablet).toFixed(2));
-
       grandTotal += total;
 
-      // Deduct stock
-      const stripsToDeduct = Math.ceil(tablets / med.tabletsPerStrip);
-      med.strips = Math.max(0, med.strips - stripsToDeduct);
+      // ✅ FIXED: work in tablets, not strips
+      // Remaining tablets after deduction, then convert back to strips (can be fractional)
+      const remainingTablets = totalAvailable - tablets;
+      med.strips = remainingTablets / med.tabletsPerStrip;
       await med.save();
 
       billItems.push({
@@ -78,13 +76,11 @@ router.post('/generate', auth, async (req, res) => {
       return res.status(400).json({ error: 'No valid medicines added.' });
     }
 
-    // ✅ SAFE SESSION ACCESS
     const generatedBy =
       req.session?.user?.name ||
       req.session?.user?.empId ||
       'Unknown';
 
-    // ✅ Handle duplicate billNo
     let bill;
     try {
       bill = await Bill.create({
@@ -111,9 +107,7 @@ router.post('/generate', auth, async (req, res) => {
 
   } catch (err) {
     console.error('🔥 Bill generation error:', err);
-    res.status(500).json({
-      error: 'Server error: ' + err.message
-    });
+    res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
 
@@ -123,10 +117,8 @@ router.delete('/delete/:id', auth, async (req, res) => {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin only.' });
     }
-
     await Bill.findByIdAndDelete(req.params.id);
     res.json({ success: true });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to delete bill.' });

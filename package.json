@@ -5,7 +5,11 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "client:install": "npm install --prefix client",
+    "client:dev": "npm run dev --prefix client",
+    "build": "npm install --prefix client && npm run build --prefix client",
+    "create-admin": "node scripts/create-admin.js"
   },
   "keywords": [],
   "author": "",
@@ -13,14 +17,10 @@
   "type": "commonjs",
   "dependencies": {
     "bcrypt": "^6.0.0",
-    "body-parser": "^2.2.2",
     "dotenv": "^17.4.0",
-    "ejs": "^5.0.1",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "jsonwebtoken": "^9.0.3",
-    "method-override": "^3.0.0",
-    "mongodb": "^7.1.1",
-    "mongoose": "^9.3.3"
+    "pg": "^8.23.1"
   }
 }

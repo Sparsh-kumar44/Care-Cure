@@ -1,54 +1,47 @@
+// Login, logout, "who am I" and password re-check.   Mounted at /api/auth
 const express = require('express');
-const router = express.Router();
 const bcrypt = require('bcrypt');
-const User = require('../models/User');
+const db = require('../db');
+const { requireLogin } = require('../middleware/auth');
+const { httpError } = require('../utils/http');
 
-// Login
+const router = express.Router();
+
+// Only the safe fields are ever sent to the browser or kept in the session.
+const toSessionUser = (u) => ({ id: u.id, empId: u.empId, name: u.name, role: u.role });
+
 router.post('/login', async (req, res) => {
-  try {
-    const { empId, password } = req.body;
+  const { empId, password } = req.body;
+  if (!empId || !password) throw httpError(400, 'Enter Employee ID and password.');
 
-    console.log("👉 LOGIN INPUT:", empId);
+  const { rows } = await db.query(
+    'SELECT id, emp_id AS "empId", name, role, password FROM users WHERE emp_id = $1',
+    [empId]
+  );
+  const user = rows[0];
+  if (!user) throw httpError(401, 'User not found.');
+  if (!(await bcrypt.compare(password, user.password))) throw httpError(401, 'Wrong password.');
 
-    const allUsers = await User.find();
-    console.log("👉 USERS IN DB:", allUsers);
-
-    const user = await User.findOne({ empId });
-    console.log("👉 FOUND USER:", user);
-
-    if (!user) return res.redirect('/?error=User not found');
-
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.redirect('/?error=Wrong password');
-
-    req.session.user = user.toObject();
-    res.redirect('/dashboard');
-
-  } catch (err) {
-    console.error(err);
-    res.redirect('/?error=Something went wrong');
-  }
+  req.session.user = toSessionUser(user);
+  res.json({ user: req.session.user });
 });
 
-// Verify current logged-in user's password (used by delete modals)
-router.post('/verify-password', async (req, res) => {
-  try {
-    if (!req.session || !req.session.user) {
-      return res.json({ valid: false });
-    }
-    const { password } = req.body;
-    if (!password) return res.json({ valid: false });
+router.post('/logout', (req, res) => {
+  req.session.destroy(() => res.json({ success: true }));
+});
 
-    // Find by empId — reliable regardless of how session was stored
-    const user = await User.findOne({ empId: req.session.user.empId });
-    if (!user) return res.json({ valid: false });
+router.get('/me', (req, res) => {
+  res.json({ user: req.session?.user || null });
+});
 
-    const valid = await bcrypt.compare(password, user.password);
-    res.json({ valid });
-  } catch (err) {
-    console.error('verify-password error:', err);
-    res.json({ valid: false });
-  }
+// Used by the "enter your password to edit/delete" pop-ups.
+router.post('/verify-password', requireLogin, async (req, res) => {
+  const { password } = req.body;
+  if (!password) return res.json({ valid: false });
+
+  const { rows } = await db.query('SELECT password FROM users WHERE id = $1', [req.user.id]);
+  const valid = rows[0] ? await bcrypt.compare(password, rows[0].password) : false;
+  res.json({ valid });
 });
 
 module.exports = router;

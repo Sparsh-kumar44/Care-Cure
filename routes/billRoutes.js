@@ -1,138 +1,122 @@
+// Bills.   Mounted at /api/bills
 const express = require('express');
+const db = require('../db');
+const { requireLogin, requireAdmin } = require('../middleware/auth');
+const { httpError, parseId } = require('../utils/http');
+
 const router = express.Router();
-const mongoose = require('mongoose');
+router.use(requireLogin);
 
-const Medicine = require('../models/Medicine');
-const Bill = require('../models/Bill');
-const auth = require('../middleware/auth');
+// A bill plus its items (as a JSON list), in the shape React expects.
+const BILL_SELECT = `
+  SELECT
+    b.id,
+    b.bill_no        AS "billNo",
+    b.patient_name   AS "patientName",
+    b.patient_age    AS "patientAge",
+    b.patient_phone  AS "patientPhone",
+    b.patient_gender AS "patientGender",
+    b.grand_total    AS "grandTotal",
+    b.generated_by   AS "generatedBy",
+    b.created_at     AS "createdAt",
+    COALESCE((
+      SELECT json_agg(json_build_object(
+        'medicineId',      i.medicine_id,
+        'name',            i.name,
+        'tablets',         i.tablets,
+        'tabletsPerStrip', i.tablets_per_strip,
+        'pricePerTablet',  i.price_per_tablet,
+        'total',           i.total
+      ) ORDER BY i.id)
+      FROM bill_items i
+      WHERE i.bill_id = b.id
+    ), '[]'::json) AS items
+  FROM bills b
+`;
 
-// Get all medicines
-router.get('/medicines-list', auth, async (req, res) => {
-  try {
-    const meds = await Medicine.find({}, 'name strips tabletsPerStrip price medId');
-    res.json(meds);
-  } catch (err) {
-    console.error('Medicine list error:', err);
-    res.status(500).json({ error: 'Failed to load medicines.' });
-  }
+const round2 = (n) => Math.round(n * 100) / 100;
+
+router.get('/', async (req, res) => {
+  const { rows } = await db.query(`${BILL_SELECT} ORDER BY b.created_at DESC`);
+  res.json(rows);
 });
 
-// Generate bill
-router.post('/generate', auth, async (req, res) => {
-  try {
-    const { patientName, patientAge, patientPhone, patientGender, items } = req.body;
+router.get('/:id', async (req, res) => {
+  const { rows } = await db.query(`${BILL_SELECT} WHERE b.id = $1`, [parseId(req.params.id)]);
+  if (!rows[0]) throw httpError(404, 'Bill not found.');
+  res.json(rows[0]);
+});
 
-    if (!patientName || !patientAge || !items || items.length === 0) {
-      return res.status(400).json({ error: 'Missing required fields.' });
-    }
+// Create a bill and take the sold tablets out of stock.
+// Everything happens in ONE transaction: if anything fails, nothing is saved.
+router.post('/', async (req, res) => {
+  const { patientName, patientAge, patientPhone, patientGender, items } = req.body;
+  if (!patientName || !patientAge || !Array.isArray(items) || items.length === 0) {
+    throw httpError(400, 'Missing required fields.');
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: [bill] } = await client.query(
+      `INSERT INTO bills (patient_name, patient_age, patient_phone, patient_gender, generated_by)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, bill_no`,
+      [patientName, Number(patientAge), patientPhone || '', patientGender || '', req.user.name]
+    );
 
     let grandTotal = 0;
-    const billItems = [];
-
     for (const item of items) {
       const tablets = Number(item.tablets);
+      if (!Number.isInteger(tablets) || tablets < 1) continue;
 
-      if (!mongoose.Types.ObjectId.isValid(item.medicineId)) {
-        return res.status(400).json({ error: 'Invalid medicine ID' });
+      // FOR UPDATE locks the row so two bills cannot sell the same tablets at once.
+      const { rows: [med] } = await client.query(
+        'SELECT id, name, strips, tablets_per_strip, price FROM medicines WHERE id = $1 FOR UPDATE',
+        [Number(item.medicineId)]
+      );
+      if (!med) throw httpError(404, 'Medicine not found. Refresh the page.');
+
+      const available = Math.round(med.strips * med.tablets_per_strip);
+      if (tablets > available) {
+        throw httpError(400, `Not enough tablets for "${med.name}". Requested: ${tablets}, Available: ${available}`);
       }
 
-      if (!item.medicineId || !tablets || tablets < 1) continue;
-
-      const med = await Medicine.findById(item.medicineId);
-
-      if (!med) {
-        return res.status(404).json({ error: 'Medicine not found. Refresh page.' });
-      }
-
-      const totalAvailable = med.strips * med.tabletsPerStrip;
-
-      if (tablets > totalAvailable) {
-        return res.status(400).json({
-          error: `Not enough tablets for "${med.name}". Requested: ${tablets}, Available: ${totalAvailable}`
-        });
-      }
-
-      const pricePerTablet = med.price / med.tabletsPerStrip;
-      const total = parseFloat((tablets * pricePerTablet).toFixed(2));
+      const pricePerTablet = med.price / med.tablets_per_strip;
+      const total = round2(tablets * pricePerTablet);
       grandTotal += total;
 
-      // ✅ FIXED: work in tablets, not strips
-      // Remaining tablets after deduction, then convert back to strips (can be fractional)
-      const remainingTablets = totalAvailable - tablets;
-      med.strips = remainingTablets / med.tabletsPerStrip;
-      await med.save();
+      await client.query(
+        `INSERT INTO bill_items (bill_id, medicine_id, name, tablets, tablets_per_strip, price_per_tablet, total)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [bill.id, med.id, med.name, tablets, med.tablets_per_strip, round2(pricePerTablet), total]
+      );
 
-      billItems.push({
-        medicineId: med._id,
-        name: med.name,
-        tablets,
-        tabletsPerStrip: med.tabletsPerStrip,
-        pricePerTablet: parseFloat(pricePerTablet.toFixed(2)),
-        total
-      });
+      // Stock is kept as strips, so convert the remaining tablets back to strips.
+      await client.query('UPDATE medicines SET strips = $1 WHERE id = $2', [
+        (available - tablets) / med.tablets_per_strip,
+        med.id
+      ]);
     }
 
-    if (billItems.length === 0) {
-      return res.status(400).json({ error: 'No valid medicines added.' });
-    }
+    if (grandTotal === 0) throw httpError(400, 'No valid medicines added.');
 
-    const generatedBy =
-      req.session?.user?.name ||
-      req.session?.user?.empId ||
-      'Unknown';
+    await client.query('UPDATE bills SET grand_total = $1 WHERE id = $2', [round2(grandTotal), bill.id]);
+    await client.query('COMMIT');
 
-    let bill;
-    try {
-      bill = await Bill.create({
-        patientName,
-        patientAge: Number(patientAge),
-        patientPhone: patientPhone || '',
-        patientGender: patientGender || '',
-        items: billItems,
-        grandTotal: parseFloat(grandTotal.toFixed(2)),
-        generatedBy
-      });
-    } catch (err) {
-      if (err.code === 11000) {
-        return res.status(500).json({ error: 'Duplicate bill number. Try again.' });
-      }
-      throw err;
-    }
-
-    res.json({
-      success: true,
-      billNo: bill.billNo,
-      billId: bill._id
-    });
-
+    res.status(201).json({ success: true, billNo: bill.bill_no, billId: bill.id });
   } catch (err) {
-    console.error('🔥 Bill generation error:', err);
-    res.status(500).json({ error: 'Server error: ' + err.message });
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
 });
 
-// Delete bill
-router.delete('/delete/:id', auth, async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin only.' });
-    }
-    await Bill.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to delete bill.' });
-  }
-});
-
-// Get single bill
-router.get('/:id', auth, async (req, res) => {
-  try {
-    const bill = await Bill.findById(req.params.id);
-    res.json(bill);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch bill.' });
-  }
+router.delete('/:id', requireAdmin, async (req, res) => {
+  await db.query('DELETE FROM bills WHERE id = $1', [parseId(req.params.id)]);
+  res.json({ success: true });
 });
 
 module.exports = router;

@@ -1,11 +1,16 @@
-module.exports = function (req, res, next) {
-  if (!req.session || !req.session.user) {
-    // If it's an API call return JSON, otherwise redirect
-    if (req.xhr || req.headers.accept?.includes('application/json')) {
-      return res.status(401).json({ error: 'Not logged in.' });
-    }
-    return res.redirect('/');
-  }
+const { httpError } = require('../utils/http');
+
+// Only logged-in users may continue.
+function requireLogin(req, res, next) {
+  if (!req.session || !req.session.user) return next(httpError(401, 'Not logged in.'));
   req.user = req.session.user;
   next();
-};
+}
+
+// Use after requireLogin: only admins may continue.
+function requireAdmin(req, res, next) {
+  if (req.user.role !== 'admin') return next(httpError(403, 'Admins only.'));
+  next();
+}
+
+module.exports = { requireLogin, requireAdmin };

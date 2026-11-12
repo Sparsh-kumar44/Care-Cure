@@ -33,7 +33,7 @@ const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: <DashboardRoundedIcon /> },
   { to: "/medicines", label: "Medicines", icon: <MedicationRoundedIcon /> },
   { to: "/billing", label: "New Bill", icon: <ReceiptLongRoundedIcon /> },
-  { to: "/bills", label: "Bill Historusey", icon: <HistoryRoundedIcon /> },
+  { to: "/bills", label: "Bill History", icon: <HistoryRoundedIcon /> },
   { to: "/employees", label: "Employees", icon: <BadgeRoundedIcon /> },
 ];
 

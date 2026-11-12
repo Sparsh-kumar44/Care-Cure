@@ -18,7 +18,6 @@ const pool = new Pool({ connectionString });
 
 const query = (text, params) => pool.query(text, params);
 
-// Create the tables if they do not exist yet.
 async function initDb() {
   const sql = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
   await pool.query(sql);

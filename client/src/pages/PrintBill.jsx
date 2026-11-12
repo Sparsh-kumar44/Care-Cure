@@ -100,7 +100,7 @@ export default function PrintBill() {
               Clinic Management System
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Contact: +91 94150-71809
+              Contact: +91 99848-42186
             </Typography>
           </Box>
 
